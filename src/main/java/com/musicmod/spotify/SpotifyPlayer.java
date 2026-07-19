@@ -1,19 +1,17 @@
 package com.musicmod.spotify;
 
 import com.musicmod.MusicMod;
-import com.musicmod.audio.MusicPlayer;
 import net.minecraft.client.MinecraftClient;
-import net.minecraft.text.ClickEvent;
-import net.minecraft.text.HoverEvent;
 import net.minecraft.text.Text;
-import se.michaelthelin.spotify.SpotifyApi;
 import se.michaelthelin.spotify.model_objects.IPlaylistItem;
 import se.michaelthelin.spotify.model_objects.miscellaneous.Device;
+import se.michaelthelin.spotify.model_objects.specification.ArtistSimplified;
 import se.michaelthelin.spotify.model_objects.specification.Track;
-import se.michaelthelin.spotify.requests.data.player.*;
 import se.michaelthelin.spotify.model_objects.miscellaneous.CurrentlyPlaying;
+import com.google.gson.JsonArray;
 
-import java.util.concurrent.CompletableFuture;
+import java.util.Arrays;
+import java.util.stream.Collectors;
 
 public class SpotifyPlayer {
     private final SpotifyAuthManager auth;
@@ -28,99 +26,89 @@ public class SpotifyPlayer {
 
     public void play() {
         ensureToken(() -> {
-            SpotifyApi api = auth.getApi();
-            StartResumeUsersPlaybackRequest request = api.startResumeUsersPlayback().build();
-            request.execute();
+            auth.getApi().startResumeUsersPlayback().build().execute();
             playing = true;
             fetchCurrentTrack();
+            return null;
         });
     }
 
     public void pause() {
         ensureToken(() -> {
-            SpotifyApi api = auth.getApi();
-            PauseUsersPlaybackRequest request = api.pauseUsersPlayback().build();
-            request.execute();
+            auth.getApi().pauseUsersPlayback().build().execute();
             playing = false;
+            return null;
         });
     }
 
     public void nextTrack() {
         ensureToken(() -> {
-            SpotifyApi api = auth.getApi();
-            SkipUsersPlaybackToNextTrackRequest request = api.skipUsersPlaybackToNextTrack().build();
-            request.execute();
+            auth.getApi().skipUsersPlaybackToNextTrack().build().execute();
             fetchCurrentTrack();
+            return null;
         });
     }
 
     public void previousTrack() {
         ensureToken(() -> {
-            SpotifyApi api = auth.getApi();
-            SkipUsersPlaybackToPreviousTrackRequest request = api.skipUsersPlaybackToPreviousTrack().build();
-            request.execute();
+            auth.getApi().skipUsersPlaybackToPreviousTrack().build().execute();
             fetchCurrentTrack();
+            return null;
         });
     }
 
     public void setVolume(int percent) {
         ensureToken(() -> {
-            SpotifyApi api = auth.getApi();
-            SetVolumeForUsersPlaybackRequest request = api.setVolumeForUsersPlayback(percent).build();
-            request.execute();
+            auth.getApi().setVolumeForUsersPlayback(percent).build().execute();
             volumePercent = percent;
+            return null;
         });
     }
 
+    @SuppressWarnings("deprecation")
     public void searchAndPlay(String query) {
         ensureToken(() -> {
-            SpotifyApi api = auth.getApi();
-            var searchRequest = api.searchItem(query, "track").limit(1).build();
-            var searchResult = searchRequest.execute();
-            if (searchResult.getTracks().getItems().length == 0) {
+            var search = auth.getApi().searchItem(query, "track").limit(1).build().execute();
+            if (search.getTracks().getItems().length == 0) {
                 sendMessage("§e[Música] No se encontró: " + query);
-                return;
+                return null;
             }
-            Track trackItem = searchResult.getTracks().getItems()[0];
-            String trackUri = trackItem.getUri();
-            StartResumeUsersPlaybackRequest request = api.startResumeUsersPlayback()
-                .uris(trackUri).build();
-            request.execute();
+            Track trackItem = search.getTracks().getItems()[0];
+            JsonArray uris = new JsonArray();
+            uris.add(trackItem.getUri());
+            auth.getApi().startResumeUsersPlayback().uris(uris).build().execute();
             playing = true;
-            fetchCurrentTrack();
             sendMessage("§a[Música] Reproduciendo: §f" + trackItem.getName());
+            fetchCurrentTrack();
+            return null;
         });
     }
 
     public void playPlaylist(String playlistName) {
         ensureToken(() -> {
-            SpotifyApi api = auth.getApi();
-            var searchRequest = api.searchItem(playlistName, "playlist").limit(1).build();
-            var searchResult = searchRequest.execute();
-            if (searchResult.getPlaylists().getItems().length == 0) {
+            var search = auth.getApi().searchItem(playlistName, "playlist").limit(1).build().execute();
+            if (search.getPlaylists().getItems().length == 0) {
                 sendMessage("§e[Música] No se encontró playlist: " + playlistName);
-                return;
+                return null;
             }
-            String playlistUri = searchResult.getPlaylists().getItems()[0].getUri();
-            StartResumeUsersPlaybackRequest request = api.startResumeUsersPlayback()
-                .contextUri(playlistUri).build();
-            request.execute();
+            String pu = search.getPlaylists().getItems()[0].getUri();
+            auth.getApi().startResumeUsersPlayback().context_uri(pu).build().execute();
             playing = true;
+            sendMessage("§a[Música] Reproduciendo playlist: " + search.getPlaylists().getItems()[0].getName());
             fetchCurrentTrack();
-            sendMessage("§a[Música] Reproduciendo playlist: §f" + searchResult.getPlaylists().getItems()[0].getName());
+            return null;
         });
     }
 
     public void fetchCurrentTrack() {
         try {
-            SpotifyApi api = auth.getApi();
-            var request = api.getUsersCurrentlyPlayingTrack().build();
-            CurrentlyPlaying track = request.execute();
-
+            CurrentlyPlaying track = auth.getApi().getUsersCurrentlyPlayingTrack().build().execute();
             if (track != null && track.getItem() != null) {
                 IPlaylistItem item = track.getItem();
                 Track trackItem = (Track) item;
-                String artists = String.join(", ", trackItem.getArtists());
+                String artists = Arrays.stream(trackItem.getArtists())
+                    .map(ArtistSimplified::getName)
+                    .collect(Collectors.joining(", "));
                 currentTrack = new SpotifyTrackInfo(
                     trackItem.getName(),
                     artists,
@@ -128,13 +116,9 @@ public class SpotifyPlayer {
                     trackItem.getDurationMs(),
                     trackItem.getExternalUrls().get("spotify"),
                     trackItem.getAlbum().getImages().length > 0
-                        ? trackItem.getAlbum().getImages()[0].getUrl() : null
+                            ? trackItem.getAlbum().getImages()[0].getUrl() : null
                 );
-                playing = track.getIsPlaying();
-
-                if (MusicMod.getInstance().getConfig().showHud && MinecraftClient.getInstance().player != null) {
-                    sendMessage("§a♫ " + currentTrack.name + " §7- " + currentTrack.artists);
-                }
+                playing = track.getIs_playing();
             }
         } catch (Exception e) {
             MusicMod.LOGGER.warn("Failed to fetch current Spotify track", e);
@@ -143,44 +127,37 @@ public class SpotifyPlayer {
 
     public void listDevices() {
         ensureToken(() -> {
-            SpotifyApi api = auth.getApi();
-            var request = api.getUsersAvailableDevices().build();
-            Device[] devices = request.execute();
+            Device[] devices = auth.getApi().getUsersAvailableDevices().build().execute();
             if (devices.length == 0) {
                 sendMessage("§c[Música] No hay dispositivos activos. Abre Spotify en algún dispositivo.");
-                return;
+                return null;
             }
             sendMessage("§a[Música] Dispositivos disponibles:");
             for (Device d : devices) {
-                String active = d.getIsActive() ? " §a(activo)" : "";
+                String active = d.getIs_active() ? " §a(activo)" : "";
                 sendMessage(" §7- " + d.getName() + active);
-                if (d.getIsActive()) activeDeviceId = d.getId();
+                if (d.getIs_active()) activeDeviceId = d.getId();
             }
+            return null;
         });
     }
 
-    private void ensureToken(SpotifyAction action) {
+    private void ensureToken(java.util.concurrent.Callable<Void> action) {
         if (!auth.isAuthenticated()) {
-            sendMessage("§c[Música] No autenticado. Usa el botón 'Login Spotify' en la GUI.");
+            sendMessage("§c[Música] No autenticado.");
             return;
         }
         try {
-            action.execute();
-        } catch (se.michaelthelin.spotify.exceptions.SpotifyWebApiException e) {
-            if (e.getMessage() != null && e.getMessage().contains("401")) {
-                if (auth.refreshTokenIfNeeded()) {
-                    try {
-                        action.execute();
-                        return;
-                    } catch (Exception e2) {
-                        MusicMod.LOGGER.error("Spotify action failed after token refresh", e2);
+            action.call();
+        } catch (Exception e) {
+            if (e instanceof se.michaelthelin.spotify.exceptions.SpotifyWebApiException) {
+                if (e.getMessage() != null && e.getMessage().contains("401")) {
+                    if (auth.refreshTokenIfNeeded()) {
+                        try { action.call(); return; } catch (Exception ignored) {}
                     }
                 }
             }
-            MusicMod.LOGGER.error("Spotify action failed", e);
-            sendMessage("§c[Música] Error de Spotify: " + e.getMessage());
-        } catch (Exception e) {
-            MusicMod.LOGGER.error("Spotify action failed", e);
+            MusicMod.LOGGER.error("Spotify error", e);
             sendMessage("§c[Música] Error: " + e.getMessage());
         }
     }
@@ -194,11 +171,6 @@ public class SpotifyPlayer {
     public boolean isPlaying() { return playing; }
     public SpotifyTrackInfo getCurrentTrack() { return currentTrack; }
     public int getVolumePercent() { return volumePercent; }
-
-    @FunctionalInterface
-    private interface SpotifyAction {
-        void execute() throws Exception;
-    }
 
     public static class SpotifyTrackInfo {
         public final String name;

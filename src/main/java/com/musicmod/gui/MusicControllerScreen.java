@@ -10,6 +10,7 @@ import com.musicmod.spotify.SpotifyPlayer.SpotifyTrackInfo;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.gui.tooltip.Tooltip;
 import net.minecraft.client.gui.widget.*;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
@@ -78,24 +79,19 @@ public class MusicControllerScreen extends Screen {
         int rightCol = guiLeft + 160;
 
         songList = new SongListWidget(
-            this, GUI_WIDTH - 180, 90,
-            guiTop + 45, guiTop + 130,
-            18, leftCol, guiTop + 45
-        );
+            width - 40, 90,
+            guiTop + 45, guiTop + 130, 18);
+        songList.setX(leftCol);
+        songList.setWidth(GUI_WIDTH - 180);
         addSelectableChild(songList);
 
         addDrawableChild(ButtonWidget.builder(
             Text.literal("▶ Play"),
             btn -> {
-                if (player.getSource().equals("spotify")) {
-                    player.setSource("local");
-                    player.stop();
-                }
-                if (player.isPlaying()) {
-                    player.pause();
-                    btn.setMessage(Text.literal("▶ Play"));
-                } else {
-                    SongEntry selected = songList.getSelectedOrNull();
+                if (player.getSource().equals("spotify")) { player.setSource("local"); player.stop(); }
+                if (player.isPlaying()) { player.pause(); btn.setMessage(Text.literal("▶ Play")); }
+                else {
+                    SongEntry selected = songList.getSelected();
                     if (selected != null) player.play(selected);
                     else if (!config.playlist.isEmpty()) player.next();
                     btn.setMessage(Text.literal("⏸ Pause"));
@@ -103,255 +99,111 @@ public class MusicControllerScreen extends Screen {
             }
         ).dimensions(leftCol, guiTop + 135, 60, 18).build());
 
-        addDrawableChild(ButtonWidget.builder(Text.literal("⏭"), btn -> player.next())
-            .dimensions(leftCol + 63, guiTop + 135, 24, 18).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("⏮"), btn -> player.previous())
-            .dimensions(leftCol + 90, guiTop + 135, 24, 18).build());
-        addDrawableChild(ButtonWidget.builder(Text.literal("⏹"), btn -> player.stop())
-            .dimensions(leftCol + 117, guiTop + 135, 24, 18).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("⏭"), btn -> player.next()).dimensions(leftCol + 63, guiTop + 135, 24, 18).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("⏮"), btn -> player.previous()).dimensions(leftCol + 90, guiTop + 135, 24, 18).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("⏹"), btn -> player.stop()).dimensions(leftCol + 117, guiTop + 135, 24, 18).build());
 
-        addDrawableChild(new SliderWidget(
-            leftCol, guiTop + 158, 140, 18,
-            Text.literal("Vol: " + (int)(config.volume * 100) + "%"),
-            config.volume
-        ) {
-            @Override
-            protected void updateMessage() {
-                this.setMessage(Text.literal("Vol: " + (int)(this.value * 100) + "%"));
-            }
-            @Override
-            protected void applyValue() {
-                config.volume = (float) this.value;
-                player.setVolume(config.volume);
-                config.save();
-            }
+        addDrawableChild(new SliderWidget(leftCol, guiTop + 158, 140, 18,
+            Text.literal("Vol: " + (int)(config.volume * 100) + "%"), config.volume) {
+            @Override protected void updateMessage() { setMessage(Text.literal("Vol: " + (int)(this.value * 100) + "%")); }
+            @Override protected void applyValue() { config.volume = (float)value; player.setVolume(config.volume); config.save(); }
         });
 
-        addDrawableChild(ButtonWidget.builder(
-            Text.literal(config.shuffle ? "🔀 ON" : "🔀 OFF"),
-            btn -> { config.shuffle = !config.shuffle; config.save(); init(); }
-        ).dimensions(leftCol, guiTop + 180, 45, 18).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal(config.shuffle ? "🔀 ON" : "🔀 OFF"), btn -> { config.shuffle = !config.shuffle; config.save(); init(); }).dimensions(leftCol, guiTop + 180, 45, 18).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal(config.loop ? "🔁 ON" : "🔁 OFF"), btn -> { config.loop = !config.loop; config.save(); init(); }).dimensions(leftCol + 48, guiTop + 180, 45, 18).build());
 
-        addDrawableChild(ButtonWidget.builder(
-            Text.literal(config.loop ? "🔁 ON" : "🔁 OFF"),
-            btn -> { config.loop = !config.loop; config.save(); init(); }
-        ).dimensions(leftCol + 48, guiTop + 180, 45, 18).build());
-
-        TextWidget twitchLabel = new TextWidget(rightCol, guiTop + 45, 80, 10,
-            Text.literal("§7Twitch:"), textRenderer);
-        addDrawableChild(twitchLabel);
-
+        addDrawableChild(new TextWidget(rightCol, guiTop + 45, 80, 10, Text.literal("§7Twitch:"), textRenderer));
         twitchChannelField = new TextFieldWidget(textRenderer, rightCol, guiTop + 57, 85, 16, Text.literal("Canal"));
         twitchChannelField.setText(config.twitchChannel);
         addDrawableChild(twitchChannelField);
+        twitchConnectButton = addDrawableChild(ButtonWidget.builder(Text.literal(MusicMod.getInstance().getVoteListener().isConnected() ? "✓ Con" : "Conectar"), btn -> {
+            String ch = twitchChannelField.getText();
+            if (!ch.isBlank()) { config.twitchChannel = ch; config.twitchIntegration = true; config.save(); MusicMod.getInstance().getVoteListener().connect(ch); }
+        }).dimensions(rightCol + 88, guiTop + 56, 70, 17).build());
 
-        twitchConnectButton = addDrawableChild(ButtonWidget.builder(
-            Text.literal(MusicMod.getInstance().getVoteListener().isConnected() ? "✓ Conectado" : "Conectar"),
-            btn -> {
-                String ch = twitchChannelField.getText();
-                if (!ch.isBlank()) {
-                    config.twitchChannel = ch;
-                    config.twitchIntegration = true;
-                    config.save();
-                    MusicMod.getInstance().getVoteListener().connect(ch);
-                }
-            }
-        ).dimensions(rightCol + 88, guiTop + 56, 80, 17).build());
-
-        TextWidget voteLabel = new TextWidget(rightCol, guiTop + 78, 80, 10,
-            Text.literal("§7Votación:"), textRenderer);
-        addDrawableChild(voteLabel);
-
-        voteDurationField = new TextFieldWidget(textRenderer, rightCol, guiTop + 90, 40, 16,
-            Text.literal("Seg"));
+        addDrawableChild(new TextWidget(rightCol, guiTop + 78, 80, 10, Text.literal("§7Votación:"), textRenderer));
+        voteDurationField = new TextFieldWidget(textRenderer, rightCol, guiTop + 90, 40, 16, Text.literal("Seg"));
         voteDurationField.setText(String.valueOf(config.voteDuration));
         voteDurationField.setTextPredicate(s -> s.matches("\\d{0,3}"));
         addDrawableChild(voteDurationField);
-
-        voteButton = addDrawableChild(ButtonWidget.builder(
-            Text.literal("🗳 Votar"),
-            btn -> {
-                try { config.voteDuration = Integer.parseInt(voteDurationField.getText()); }
-                catch (NumberFormatException ignored) {}
-                player.startVote(config.voteDuration);
-            }
-        ).dimensions(rightCol + 44, guiTop + 89, 55, 17).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("🗳 Votar"), btn -> {
+            try { config.voteDuration = Integer.parseInt(voteDurationField.getText()); } catch (NumberFormatException ignored) {}
+            player.startVote(config.voteDuration);
+        }).dimensions(rightCol + 44, guiTop + 89, 55, 17).build());
     }
 
     private void drawSpotifyTab() {
         var auth = MusicMod.getInstance().getSpotifyAuthManager();
         var sp = MusicMod.getInstance().getSpotifyPlayer();
 
-        spotifyLoginButton = addDrawableChild(ButtonWidget.builder(
-            Text.literal(auth.isAuthenticated() ? "✓ Spotify Conectado" : "🔗 Login Spotify"),
-            btn -> {
-                if (!auth.isAuthenticated()) {
-                    auth.login();
-                } else {
-                    auth.logout();
-                    init();
-                }
-            }
-        ).dimensions(guiLeft + 10, guiTop + 45, 140, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal(auth.isAuthenticated() ? "✓ Spotify Conectado" : "🔗 Login Spotify"), btn -> {
+            if (!auth.isAuthenticated()) auth.login(); else { auth.logout(); init(); }
+        }).dimensions(guiLeft + 10, guiTop + 45, 145, 20).build());
 
         SpotifyConfig sc = config.spotify;
-        addDrawableChild(ButtonWidget.builder(
-            Text.literal(sc.enabled ? "Integración: ON" : "Integración: OFF"),
-            btn -> { sc.enabled = !sc.enabled; config.save(); init(); }
-        ).dimensions(guiLeft + 155, guiTop + 45, 90, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal(sc.enabled ? "Integración: ON" : "Integración: OFF"), btn -> { sc.enabled = !sc.enabled; config.save(); init(); }).dimensions(guiLeft + 160, guiTop + 45, 90, 20).build());
 
         if (!auth.isAuthenticated()) return;
 
         SpotifyTrackInfo track = sp.getCurrentTrack();
         if (track != null) {
-            TextWidget trackWidget = new TextWidget(guiLeft + 10, guiTop + 72, GUI_WIDTH - 20, 12,
-                Text.literal("§lNow:§r " + track.name + " §7- " + track.artists), textRenderer);
-            addDrawableChild(trackWidget);
+            addDrawableChild(new TextWidget(guiLeft + 10, guiTop + 72, GUI_WIDTH - 20, 12,
+                Text.literal("§lNow:§r " + track.name + " §7- " + track.artists), textRenderer));
         } else {
             addDrawableChild(new TextWidget(guiLeft + 10, guiTop + 72, GUI_WIDTH - 20, 12,
                 Text.literal("§7Sin reproducción activa"), textRenderer));
         }
 
-        addDrawableChild(ButtonWidget.builder(
-            Text.literal(sp.isPlaying() ? "⏸ Pausar" : "▶ Reproducir"),
-            btn -> {
-                if (player.getSource().equals("spotify") && player.isPlaying()) {
-                    sp.pause();
-                } else {
-                    player.playSpotify();
-                }
-                init();
-            }
-        ).dimensions(guiLeft + 10, guiTop + 90, 70, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal(sp.isPlaying() ? "⏸ Pausar" : "▶ Reproducir"), btn -> {
+            if (player.getSource().equals("spotify") && player.isPlaying()) sp.pause(); else player.playSpotify(); init();
+        }).dimensions(guiLeft + 10, guiTop + 90, 70, 20).build());
 
-        addDrawableChild(ButtonWidget.builder(
-            Text.literal("⏭ Siguiente"),
-            btn -> { sp.nextTrack(); init(); }
-        ).dimensions(guiLeft + 85, guiTop + 90, 65, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("⏭ Sig"), btn -> { sp.nextTrack(); init(); }).dimensions(guiLeft + 85, guiTop + 90, 50, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("⏮ Ant"), btn -> { sp.previousTrack(); init(); }).dimensions(guiLeft + 140, guiTop + 90, 50, 20).build());
 
-        addDrawableChild(ButtonWidget.builder(
-            Text.literal("⏮ Anterior"),
-            btn -> { sp.previousTrack(); init(); }
-        ).dimensions(guiLeft + 155, guiTop + 90, 65, 20).build());
-
-        addDrawableChild(new SliderWidget(
-            guiLeft + 10, guiTop + 115, 140, 18,
-            Text.literal("Vol: " + sp.getVolumePercent() + "%"),
-            sp.getVolumePercent() / 100.0
-        ) {
-            @Override
-            protected void updateMessage() {
-                this.setMessage(Text.literal("Vol: " + (int)(this.value * 100) + "%"));
-            }
-            @Override
-            protected void applyValue() {
-                sp.setVolume((int)(this.value * 100));
-            }
+        addDrawableChild(new SliderWidget(guiLeft + 10, guiTop + 115, 140, 18,
+            Text.literal("Vol: " + sp.getVolumePercent() + "%"), sp.getVolumePercent() / 100.0) {
+            @Override protected void updateMessage() { setMessage(Text.literal("Vol: " + (int)(this.value * 100) + "%")); }
+            @Override protected void applyValue() { sp.setVolume((int)(this.value * 100)); }
         });
 
-        TextWidget searchLabel = new TextWidget(guiLeft + 10, guiTop + 140, 80, 10,
-            Text.literal("§7Buscar canción:"), textRenderer);
-        addDrawableChild(searchLabel);
-
-        spotifySearchField = new TextFieldWidget(textRenderer, guiLeft + 10, guiTop + 153, 140, 16,
-            Text.literal("Nombre o artista..."));
+        addDrawableChild(new TextWidget(guiLeft + 10, guiTop + 140, 80, 10, Text.literal("§7Buscar:"), textRenderer));
+        spotifySearchField = new TextFieldWidget(textRenderer, guiLeft + 10, guiTop + 152, 140, 16, Text.literal("Nombre o artista..."));
         addDrawableChild(spotifySearchField);
+        addDrawableChild(ButtonWidget.builder(Text.literal("🔍"), btn -> { String q = spotifySearchField.getText(); if (!q.isBlank()) sp.searchAndPlay(q); }).dimensions(guiLeft + 155, guiTop + 151, 25, 18).build());
 
-        addDrawableChild(ButtonWidget.builder(
-            Text.literal("🔍 Buscar"),
-            btn -> {
-                String q = spotifySearchField.getText();
-                if (!q.isBlank()) {
-                    sp.searchAndPlay(q);
-                }
-            }
-        ).dimensions(guiLeft + 155, guiTop + 152, 60, 18).build());
-
-        addDrawableChild(ButtonWidget.builder(
-            Text.literal("▶ Playlist..."),
-            btn -> {
-                String q = spotifySearchField.getText();
-                if (!q.isBlank()) {
-                    sp.playPlaylist(q);
-                }
-            }
-        ).dimensions(guiLeft + 10, guiTop + 175, 100, 18).build());
-
-        addDrawableChild(ButtonWidget.builder(
-            Text.literal("📱 Dispositivos"),
-            btn -> sp.listDevices()
-        ).dimensions(guiLeft + 115, guiTop + 175, 100, 18).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("▶ Playlist"), btn -> { String q = spotifySearchField.getText(); if (!q.isBlank()) sp.playPlaylist(q); }).dimensions(guiLeft + 10, guiTop + 175, 80, 18).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("📱 Disp."), btn -> sp.listDevices()).dimensions(guiLeft + 95, guiTop + 175, 70, 18).build());
     }
 
     private void drawVoiceTab() {
         var voice = MusicMod.getInstance().getVoiceManager();
         VoiceConfig vc = config.voice;
 
-        voiceToggleButton = addDrawableChild(ButtonWidget.builder(
-            Text.literal(voice.isListening() ? "🔴 Desactivar Voz" : "🎤 Activar Voz"),
-            btn -> {
-                if (voice.isListening()) {
-                    voice.stopListening();
-                } else {
-                    voice.startListening();
-                }
-                init();
-            }
-        ).dimensions(guiLeft + 10, guiTop + 45, 130, 20).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal(voice.isListening() ? "🔴 Desactivar Voz" : "🎤 Activar Voz"), btn -> {
+            if (voice.isListening()) voice.stopListening(); else voice.startListening();
+            init();
+        }).dimensions(guiLeft + 10, guiTop + 45, 130, 20).build());
 
-        String status;
-        if (!voice.isModelLoaded()) {
-            status = "§cModelo no cargado";
-        } else if (voice.isListening()) {
-            status = "§a✓ Escuchando...";
-        } else {
-            status = "§7Inactivo";
-        }
-        addDrawableChild(new TextWidget(guiLeft + 145, guiTop + 47, 100, 10,
-            Text.literal(status), textRenderer));
+        String status = !voice.isModelLoaded() ? "§cModelo no encontrado" : voice.isListening() ? "§a✓ Escuchando..." : "§7Inactivo";
+        addDrawableChild(new TextWidget(guiLeft + 145, guiTop + 47, 150, 10, Text.literal(status), textRenderer));
 
-        addDrawableChild(new TextWidget(guiLeft + 10, guiTop + 68, GUI_WIDTH - 20, 10,
-            Text.literal("§7Tecla rápida: V"), textRenderer));
+        addDrawableChild(new TextWidget(guiLeft + 10, guiTop + 68, 150, 10, Text.literal("§7Tecla rápida: V"), textRenderer));
+        addDrawableChild(new TextWidget(guiLeft + 10, guiTop + 82, 150, 10, Text.literal("§7Modelo: vosk-model-small-es-0.42"), textRenderer));
 
-        addDrawableChild(new TextWidget(guiLeft + 10, guiTop + 85, GUI_WIDTH - 20, 10,
-            Text.literal("§7Modelo: vosk-model-small-es-0.42"), textRenderer));
+        addDrawableChild(ButtonWidget.builder(Text.literal(vc.continuousListening ? "Contínua: ON" : "Contínua: OFF"), btn -> { vc.continuousListening = !vc.continuousListening; config.save(); init(); }).dimensions(guiLeft + 10, guiTop + 97, 110, 16).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal(vc.showRecognizedText ? "Texto: ON" : "Texto: OFF"), btn -> { vc.showRecognizedText = !vc.showRecognizedText; config.save(); init(); }).dimensions(guiLeft + 125, guiTop + 97, 80, 16).build());
 
-        addDrawableChild(ButtonWidget.builder(
-            Text.literal(vc.continuousListening ? "Escucha contínua: ON" : "Escucha contínua: OFF"),
-            btn -> { vc.continuousListening = !vc.continuousListening; config.save(); init(); }
-        ).dimensions(guiLeft + 10, guiTop + 100, 140, 18).build());
-
-        addDrawableChild(ButtonWidget.builder(
-            Text.literal(vc.showRecognizedText ? "Mostrar texto: ON" : "Mostrar texto: OFF"),
-            btn -> { vc.showRecognizedText = !vc.showRecognizedText; config.save(); init(); }
-        ).dimensions(guiLeft + 155, guiTop + 100, 140, 18).build());
-
-        TextWidget cmdLabel = new TextWidget(guiLeft + 10, guiTop + 125, 100, 10,
-            Text.literal("§lComandos disponibles:"), textRenderer);
-        addDrawableChild(cmdLabel);
-
+        addDrawableChild(new TextWidget(guiLeft + 10, guiTop + 120, 100, 10, Text.literal("§lComandos disponibles:"), textRenderer));
         String[] cmds = {
-            "§e\"reproducir/poner/play\" + nombre",
-            "§e\"pausa/parar/stop\"",
-            "§e\"siguiente/next/skip\"",
-            "§e\"sube/baja volumen\"",
-            "§e\"aleatorio/shuffle\"",
-            "§e\"inicia voto/votación\"",
-            "§e\"abre menú/music controller\"",
-            "§7Sin comando: busca en Spotify"
+            "§ereproducir/play + nombre", "§epausa/stop", "§esiguiente/next", "§esube/baja volumen",
+            "§ealeatorio/shuffle", "§einicia voto", "§eabre menú", "§7Otros -> busca en Spotify"
         };
-        int y = guiTop + 138;
-        for (String c : cmds) {
-            addDrawableChild(new TextWidget(guiLeft + 10, y, GUI_WIDTH - 20, 10,
-                Text.literal(c), textRenderer));
-            y += 10;
-        }
+        int y = 133;
+        for (String c : cmds) { addDrawableChild(new TextWidget(guiLeft + 10, guiTop + y, 200, 9, Text.literal(c), textRenderer)); y += 10; }
 
-        addDrawableChild(ButtonWidget.builder(
-            Text.literal("📥 Descargar modelo Vosk"),
-            btn -> MinecraftClient.getInstance().player.sendMessage(
-                net.minecraft.text.Text.literal("§aDescarga el modelo en: https://alphacephei.com/vosk/models"))
-        ).dimensions(guiLeft + 10, guiTop + 220, 150, 18).build());
+        addDrawableChild(ButtonWidget.builder(Text.literal("📥 Descargar modelo Vosk"), btn -> MinecraftClient.getInstance().player.sendMessage(
+            net.minecraft.text.Text.literal("§aDescarga en: https://alphacephei.com/vosk/models"))).dimensions(guiLeft + 10, guiTop + 220, 150, 18).build());
     }
 
     @Override
@@ -364,67 +216,61 @@ public class MusicControllerScreen extends Screen {
 
         if (currentTab == Tab.LOCAL) {
             SongEntry current = player.getCurrentSong();
-            String now = player.getSource().equals("spotify")
-                ? "§b♫ Spotify conectado"
-                : (current != null ? "§aNow: " + current.name : "§7No song playing");
+            String now = player.getSource().equals("spotify") ? "§b♫ Spotify conectado" : (current != null ? "§aNow: " + current.name : "§7No song playing");
             context.drawText(textRenderer, Text.literal(now), guiLeft + 8, guiTop + GUI_HEIGHT - 16, 0xFFFFFF, true);
-
             if (player.isVoteActive()) {
                 String vote = "§eVote: " + player.getVoteTimeLeft() + "s";
-                context.drawText(textRenderer, Text.literal(vote),
-                    guiLeft + GUI_WIDTH / 2 - 30, guiTop + GUI_HEIGHT - 16, 0xFFFF00, true);
+                context.drawText(textRenderer, Text.literal(vote), guiLeft + GUI_WIDTH / 2 - 30, guiTop + GUI_HEIGHT - 16, 0xFFFF00, true);
             }
         }
 
-        if (currentTab == Tab.LOCAL && songList != null) {
-            songList.render(context, mouseX, mouseY, delta);
-        }
-
+        if (currentTab == Tab.LOCAL && songList != null) songList.render(context, mouseX, mouseY, delta);
         super.render(context, mouseX, mouseY, delta);
     }
 
     @Override
     public boolean shouldPause() { return false; }
 
-    private static class SongListWidget extends WidgetListWidget<SongEntryWidget> {
+    private class SongListWidget extends AlwaysSelectedEntryListWidget<SongEntryWidget> {
         private final List<SongEntry> entries;
 
-        public SongListWidget(Screen screen, int width, int height, int top, int bottom, int itemHeight,
-                              int x, int y) {
-            super(screen, width, height, y, itemHeight);
-            this.entries = MusicMod.getInstance().getConfig().playlist;
-            setX(x);
+        public SongListWidget(int width, int height, int top, int bottom, int itemHeight) {
+            super(MinecraftClient.getInstance(), width, height, top, bottom);
+            this.entries = config.playlist;
             for (int i = 0; i < entries.size(); i++) {
                 addEntry(new SongEntryWidget(entries.get(i), i));
             }
         }
 
-        public SongEntry getSelectedOrNull() {
+        public SongEntry getSelected() {
             SongEntryWidget w = getSelectedOrNull();
             return w != null ? w.song : null;
         }
 
         @Override
-        public int getRowWidth() { return width - 10; }
+        public int getRowWidth() { return width / 2 - 10; }
         @Override
-        protected int getScrollbarPositionX() { return getX() + width - 6; }
+        protected int getScrollbarX() { return getX() + width / 2 - 6; }
     }
 
-    private static class SongEntryWidget extends WidgetListWidget.Entry<SongEntryWidget> {
+    private class SongEntryWidget extends AlwaysSelectedEntryListWidget.Entry<SongEntryWidget> {
         private final SongEntry song;
-        private final int index;
+        private final int idx;
 
-        SongEntryWidget(SongEntry song, int index) {
+        SongEntryWidget(SongEntry song, int idx) {
             this.song = song;
-            this.index = index;
+            this.idx = idx;
         }
 
         @Override
-        public void render(DrawContext context, int index, int y, int x, int entryWidth, int entryHeight,
-                           int mouseX, int mouseY, boolean hovered, float tickDelta) {
-            String text = (this.index + 1) + ". " + song.name;
-            context.drawText(MinecraftClient.getInstance().textRenderer, text,
-                x + 5, y + (entryHeight - 8) / 2, hovered ? 0xFFFFAA : 0xFFFFFF, false);
+        public void render(DrawContext context, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float tickDelta) {
+            String text = (idx + 1) + ". " + song.name;
+            context.drawText(textRenderer, text, x + 5, y + (entryHeight - 8) / 2, hovered ? 0xFFFFAA : 0xFFFFFF, false);
+        }
+
+        @Override
+        public Text getNarration() {
+            return Text.literal(song.name);
         }
     }
 }
