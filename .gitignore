@@ -1,8 +1,7 @@
 build/
 .gradle/
-gradle/
-gradlew
-gradlew.bat
+!gradle/wrapper/
+gradle/wrapper/gradle-wrapper.properties
 *.jar
 *.zip
 *.iml
