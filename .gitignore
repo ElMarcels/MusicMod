@@ -1,7 +1,5 @@
 build/
 .gradle/
-!gradle/wrapper/
-gradle/wrapper/gradle-wrapper.properties
 *.jar
 *.zip
 *.iml
