@@ -21,8 +21,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
 
 public class SpotifyAuthManager {
-    private static final String CLIENT_ID = "YOUR_SPOTIFY_CLIENT_ID";
-    private static final String CLIENT_SECRET = "YOUR_SPOTIFY_CLIENT_SECRET";
+    private static String clientId = System.getenv().getOrDefault("SPOTIFY_CLIENT_ID", "YOUR_SPOTIFY_CLIENT_ID");
+    private static String clientSecret = System.getenv().getOrDefault("SPOTIFY_CLIENT_SECRET", "YOUR_SPOTIFY_CLIENT_SECRET");
     private static final URI REDIRECT_URI = SpotifyHttpManager.makeUri("http://localhost:8888/callback");
     private static final int LOCAL_PORT = 8888;
 
@@ -44,8 +44,8 @@ public class SpotifyAuthManager {
 
     private SpotifyApi buildApi() {
         return new SpotifyApi.Builder()
-            .setClientId(CLIENT_ID)
-            .setClientSecret(CLIENT_SECRET)
+            .setClientId(clientId)
+            .setClientSecret(clientSecret)
             .setRedirectUri(REDIRECT_URI)
             .setAccessToken(accessToken)
             .setRefreshToken(refreshToken)
