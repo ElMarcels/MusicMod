@@ -1,0 +1,81 @@
+plugins {
+    id 'fabric-loom' version '1.7-SNAPSHOT'
+    id 'maven-publish'
+}
+
+version = project.mod_version
+group = project.maven_group
+
+base {
+    archivesName = project.archives_base_name
+}
+
+repositories {
+    mavenCentral()
+    maven { url 'https://jitpack.io' }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+
+    // Spotify API (without bundled http client)
+    implementation ('se.michaelthelin.spotify:spotify-web-api-java:8.4.1') {
+        exclude group: 'org.apache.hc', module: 'httpclient5'
+        exclude group: 'com.fasterxml.jackson.core'
+    }
+
+    // HTTP client for Spotify OAuth token refresh
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
+
+    // Embedded HTTP server for OAuth callback
+    implementation 'com.sun.net.httpserver:http:20070405'
+
+    // Vosk offline speech recognition
+    implementation 'com.alphacephei:vosk:0.3.45'
+
+    // JSON parsing
+    implementation 'com.google.code.gson:gson:2.11.0'
+
+    // Include all runtime deps in the jar
+    include 'se.michaelthelin.spotify:spotify-web-api-java:8.4.1'
+    include 'com.squareup.okhttp3:okhttp:4.12.0'
+    include 'com.squareup.okhttp3:logging-interceptor:4.12.0'
+    include 'com.alphacephei:vosk:0.3.45'
+    include 'com.google.code.gson:gson:2.11.0'
+}
+
+processResources {
+    inputs.property "version", project.version
+    filesMatching("fabric.mod.json") {
+        expand "version": project.version
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.release = 21
+}
+
+java {
+    withSourcesJar()
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+jar {
+    from("LICENSE") {
+        rename { "${it}_${project.base.archivesName.get()}" }
+    }
+}
+
+publishing {
+    publications {
+        create("mavenJava", MavenPublication) {
+            artifactId = project.archives_base_name
+            from components.java
+        }
+    }
+}

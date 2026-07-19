@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "id": "musicmod",
+  "version": "${version}",
+  "name": "Music Controller",
+  "description": "In-game music player with Spotify integration, voice commands, and Twitch voting",
+  "authors": ["MusicMod Dev"],
+  "contact": {},
+  "license": "MIT",
+  "icon": "assets/musicmod/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "com.musicmod.MusicMod"
+    ],
+    "modmenu": [
+      "com.musicmod.config.ModMenuIntegration"
+    ]
+  },
+  "mixins": [
+    "musicmod.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "fabric": "*",
+    "minecraft": ">=1.21.1",
+    "java": ">=21"
+  },
+  "suggests": {
+    "modmenu": "*"
+  }
+}

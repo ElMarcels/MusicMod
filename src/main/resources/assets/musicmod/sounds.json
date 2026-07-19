@@ -1,0 +1,44 @@
+{
+  "cat": {
+    "sounds": ["musicmod:music/cat"]
+  },
+  "blocks": {
+    "sounds": ["musicmod:music/blocks"]
+  },
+  "chirp": {
+    "sounds": ["musicmod:music/chirp"]
+  },
+  "far": {
+    "sounds": ["musicmod:music/far"]
+  },
+  "mall": {
+    "sounds": ["musicmod:music/mall"]
+  },
+  "mellohi": {
+    "sounds": ["musicmod:music/mellohi"]
+  },
+  "stal": {
+    "sounds": ["musicmod:music/stal"]
+  },
+  "strad": {
+    "sounds": ["musicmod:music/strad"]
+  },
+  "ward": {
+    "sounds": ["musicmod:music/ward"]
+  },
+  "eleven": {
+    "sounds": ["musicmod:music/11"]
+  },
+  "wait": {
+    "sounds": ["musicmod:music/wait"]
+  },
+  "pigstep": {
+    "sounds": ["musicmod:music/pigstep"]
+  },
+  "relic": {
+    "sounds": ["musicmod:music/relic"]
+  },
+  "precipice": {
+    "sounds": ["musicmod:music/precipice"]
+  }
+}
