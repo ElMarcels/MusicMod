@@ -7,12 +7,13 @@ import com.musicmod.spotify.SpotifyPlayer.SpotifyTrackInfo;
 import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.render.RenderTickCounter;
 
 public class HudOverlay implements HudRenderCallback {
     private static final int PADDING = 4;
 
     @Override
-    public void onHudRender(DrawContext context, float tickDelta) {
+    public void onHudRender(DrawContext context, RenderTickCounter tickCounter) {
         if (!MusicMod.getInstance().getConfig().showHud) return;
         if (!MusicMod.getInstance().getConfig().enabled) return;
 
@@ -24,7 +25,6 @@ public class HudOverlay implements HudRenderCallback {
         int y = PADDING;
         boolean hasContent = false;
 
-        // Spotify info
         if (player.getSource().equals("spotify") && player.isPlaying()) {
             var spotify = MusicMod.getInstance().getSpotifyPlayer();
             if (spotify != null) {
@@ -47,7 +47,6 @@ public class HudOverlay implements HudRenderCallback {
             }
         }
 
-        // Local music info
         if (!player.getSource().equals("spotify") && player.isPlaying() && player.getCurrentSong() != null) {
             SongEntry current = player.getCurrentSong();
             String text = "♫ " + current.name;
@@ -58,7 +57,6 @@ public class HudOverlay implements HudRenderCallback {
             hasContent = true;
         }
 
-        // Vote status
         if (player.isVoteActive()) {
             String voteText = "🗳 Vote: " + player.getVoteTimeLeft() + "s";
             int width = client.textRenderer.getWidth(voteText);
@@ -68,7 +66,6 @@ public class HudOverlay implements HudRenderCallback {
             hasContent = true;
         }
 
-        // Voice listening indicator
         var voice = MusicMod.getInstance().getVoiceManager();
         if (voice != null && voice.isListening()) {
             String vText = "🎤 Escuchando...";
@@ -76,15 +73,6 @@ public class HudOverlay implements HudRenderCallback {
             context.fill(right - width - 4, y - 1, right + 2, y + 10, 0x80000000);
             context.drawText(client.textRenderer, vText, right - width, y + 1, 0x00FFAA, false);
             hasContent = true;
-        }
-
-        // Spotify connection status
-        var auth = MusicMod.getInstance().getSpotifyAuthManager();
-        if (auth != null && auth.isAuthenticated() && !hasContent) {
-            String sText = "♫ Spotify conectado";
-            int width = client.textRenderer.getWidth(sText);
-            context.fill(right - width - 4, y - 1, right + 2, y + 10, 0x80000000);
-            context.drawText(client.textRenderer, sText, right - width, y + 1, 0x1DB954, false);
         }
     }
 }

@@ -7,9 +7,11 @@ import net.minecraft.text.ClickEvent;
 import net.minecraft.text.HoverEvent;
 import net.minecraft.text.Text;
 import se.michaelthelin.spotify.SpotifyApi;
-import se.michaelthelin.spotify.model_objects.miscellaneous.CurrentTrack;
+import se.michaelthelin.spotify.model_objects.IPlaylistItem;
 import se.michaelthelin.spotify.model_objects.miscellaneous.Device;
+import se.michaelthelin.spotify.model_objects.specification.Track;
 import se.michaelthelin.spotify.requests.data.player.*;
+import se.michaelthelin.spotify.model_objects.miscellaneous.CurrentlyPlaying;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -24,85 +26,80 @@ public class SpotifyPlayer {
         this.auth = auth;
     }
 
-    public CompletableFuture<Boolean> play() {
-        return ensureToken(() -> {
+    public void play() {
+        ensureToken(() -> {
             SpotifyApi api = auth.getApi();
             StartResumeUsersPlaybackRequest request = api.startResumeUsersPlayback().build();
             request.execute();
             playing = true;
             fetchCurrentTrack();
-            return true;
         });
     }
 
-    public CompletableFuture<Boolean> pause() {
-        return ensureToken(() -> {
+    public void pause() {
+        ensureToken(() -> {
             SpotifyApi api = auth.getApi();
             PauseUsersPlaybackRequest request = api.pauseUsersPlayback().build();
             request.execute();
             playing = false;
-            return true;
         });
     }
 
-    public CompletableFuture<Boolean> nextTrack() {
-        return ensureToken(() -> {
+    public void nextTrack() {
+        ensureToken(() -> {
             SpotifyApi api = auth.getApi();
             SkipUsersPlaybackToNextTrackRequest request = api.skipUsersPlaybackToNextTrack().build();
             request.execute();
             fetchCurrentTrack();
-            return true;
         });
     }
 
-    public CompletableFuture<Boolean> previousTrack() {
-        return ensureToken(() -> {
+    public void previousTrack() {
+        ensureToken(() -> {
             SpotifyApi api = auth.getApi();
             SkipUsersPlaybackToPreviousTrackRequest request = api.skipUsersPlaybackToPreviousTrack().build();
             request.execute();
             fetchCurrentTrack();
-            return true;
         });
     }
 
-    public CompletableFuture<Boolean> setVolume(int percent) {
-        return ensureToken(() -> {
+    public void setVolume(int percent) {
+        ensureToken(() -> {
             SpotifyApi api = auth.getApi();
             SetVolumeForUsersPlaybackRequest request = api.setVolumeForUsersPlayback(percent).build();
             request.execute();
             volumePercent = percent;
-            return true;
         });
     }
 
-    public CompletableFuture<Boolean> searchAndPlay(String query) {
-        return ensureToken(() -> {
+    public void searchAndPlay(String query) {
+        ensureToken(() -> {
             SpotifyApi api = auth.getApi();
             var searchRequest = api.searchItem(query, "track").limit(1).build();
             var searchResult = searchRequest.execute();
             if (searchResult.getTracks().getItems().length == 0) {
                 sendMessage("§e[Música] No se encontró: " + query);
-                return false;
+                return;
             }
-            String trackUri = searchResult.getTracks().getItems()[0].getUri();
+            Track trackItem = searchResult.getTracks().getItems()[0];
+            String trackUri = trackItem.getUri();
             StartResumeUsersPlaybackRequest request = api.startResumeUsersPlayback()
-                .uris(new String[]{trackUri}).build();
+                .uris(trackUri).build();
             request.execute();
             playing = true;
             fetchCurrentTrack();
-            sendMessage("§a[Música] Reproduciendo: §f" + searchResult.getTracks().getItems()[0].getName());
-            return true;
+            sendMessage("§a[Música] Reproduciendo: §f" + trackItem.getName());
         });
     }
 
-    public CompletableFuture<Boolean> playPlaylist(String playlistName) {
-        return ensureToken(() -> {
+    public void playPlaylist(String playlistName) {
+        ensureToken(() -> {
             SpotifyApi api = auth.getApi();
             var searchRequest = api.searchItem(playlistName, "playlist").limit(1).build();
             var searchResult = searchRequest.execute();
             if (searchResult.getPlaylists().getItems().length == 0) {
                 sendMessage("§e[Música] No se encontró playlist: " + playlistName);
-                return false;
+                return;
             }
             String playlistUri = searchResult.getPlaylists().getItems()[0].getUri();
             StartResumeUsersPlaybackRequest request = api.startResumeUsersPlayback()
@@ -111,28 +108,29 @@ public class SpotifyPlayer {
             playing = true;
             fetchCurrentTrack();
             sendMessage("§a[Música] Reproduciendo playlist: §f" + searchResult.getPlaylists().getItems()[0].getName());
-            return true;
         });
     }
 
     public void fetchCurrentTrack() {
         try {
             SpotifyApi api = auth.getApi();
-            GetUsersCurrentlyPlayingTrackRequest request = api.getUsersCurrentlyPlayingTrack().build();
-            CurrentTrack track = request.execute();
+            var request = api.getUsersCurrentlyPlayingTrack().build();
+            CurrentlyPlaying track = request.execute();
 
             if (track != null && track.getItem() != null) {
-                String artists = String.join(", ", track.getItem().getArtists());
+                IPlaylistItem item = track.getItem();
+                Track trackItem = (Track) item;
+                String artists = String.join(", ", trackItem.getArtists());
                 currentTrack = new SpotifyTrackInfo(
-                    track.getItem().getName(),
+                    trackItem.getName(),
                     artists,
-                    track.getItem().getAlbum().getName(),
-                    track.getItem().getDurationMs(),
-                    track.getItem().getExternalUrls().get("spotify"),
-                    track.getItem().getAlbum().getImages().length > 0
-                        ? track.getItem().getAlbum().getImages()[0].getUrl() : null
+                    trackItem.getAlbum().getName(),
+                    trackItem.getDurationMs(),
+                    trackItem.getExternalUrls().get("spotify"),
+                    trackItem.getAlbum().getImages().length > 0
+                        ? trackItem.getAlbum().getImages()[0].getUrl() : null
                 );
-                playing = track.getIs_playing();
+                playing = track.getIsPlaying();
 
                 if (MusicMod.getInstance().getConfig().showHud && MinecraftClient.getInstance().player != null) {
                     sendMessage("§a♫ " + currentTrack.name + " §7- " + currentTrack.artists);
@@ -143,39 +141,37 @@ public class SpotifyPlayer {
         }
     }
 
-    public CompletableFuture<Boolean> listDevices() {
-        return ensureToken(() -> {
+    public void listDevices() {
+        ensureToken(() -> {
             SpotifyApi api = auth.getApi();
             var request = api.getUsersAvailableDevices().build();
             Device[] devices = request.execute();
             if (devices.length == 0) {
                 sendMessage("§c[Música] No hay dispositivos activos. Abre Spotify en algún dispositivo.");
-                return false;
+                return;
             }
             sendMessage("§a[Música] Dispositivos disponibles:");
             for (Device d : devices) {
-                String active = d.getIs_active() ? " §a(activo)" : "";
+                String active = d.getIsActive() ? " §a(activo)" : "";
                 sendMessage(" §7- " + d.getName() + active);
-                if (d.getIs_active()) activeDeviceId = d.getId();
+                if (d.getIsActive()) activeDeviceId = d.getId();
             }
-            return true;
         });
     }
 
-    private CompletableFuture<Boolean> ensureToken(SpotifyAction action) {
+    private void ensureToken(SpotifyAction action) {
         if (!auth.isAuthenticated()) {
             sendMessage("§c[Música] No autenticado. Usa el botón 'Login Spotify' en la GUI.");
-            return CompletableFuture.completedFuture(false);
+            return;
         }
         try {
             action.execute();
-            return CompletableFuture.completedFuture(true);
         } catch (se.michaelthelin.spotify.exceptions.SpotifyWebApiException e) {
             if (e.getMessage() != null && e.getMessage().contains("401")) {
                 if (auth.refreshTokenIfNeeded()) {
                     try {
                         action.execute();
-                        return CompletableFuture.completedFuture(true);
+                        return;
                     } catch (Exception e2) {
                         MusicMod.LOGGER.error("Spotify action failed after token refresh", e2);
                     }
@@ -183,11 +179,9 @@ public class SpotifyPlayer {
             }
             MusicMod.LOGGER.error("Spotify action failed", e);
             sendMessage("§c[Música] Error de Spotify: " + e.getMessage());
-            return CompletableFuture.completedFuture(false);
         } catch (Exception e) {
             MusicMod.LOGGER.error("Spotify action failed", e);
             sendMessage("§c[Música] Error: " + e.getMessage());
-            return CompletableFuture.completedFuture(false);
         }
     }
 

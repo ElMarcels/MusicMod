@@ -14,7 +14,6 @@ import net.minecraft.client.gui.widget.*;
 import net.minecraft.text.Text;
 import net.minecraft.util.Identifier;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 
 public class MusicControllerScreen extends Screen {
     private static final int GUI_WIDTH = 340;
@@ -32,9 +31,6 @@ public class MusicControllerScreen extends Screen {
     private ButtonWidget twitchConnectButton;
     private ButtonWidget spotifyLoginButton;
     private ButtonWidget voiceToggleButton;
-    private ButtonWidget spotifyPlayPauseButton;
-    private ButtonWidget spotifyNextButton;
-    private ButtonWidget spotifyPrevButton;
 
     private enum Tab { LOCAL, SPOTIFY, VOICE }
 
@@ -56,7 +52,6 @@ public class MusicControllerScreen extends Screen {
             case VOICE -> drawVoiceTab();
         }
 
-        // Close button
         addDrawableChild(ButtonWidget.builder(
             Text.literal("✕"),
             btn -> close()
@@ -78,20 +73,17 @@ public class MusicControllerScreen extends Screen {
         }
     }
 
-    // ============== LOCAL TAB ==============
     private void drawLocalTab() {
         int leftCol = guiLeft + 10;
         int rightCol = guiLeft + 160;
 
-        // Song list
         songList = new SongListWidget(
-            mc, GUI_WIDTH - 180, 90,
+            this, GUI_WIDTH - 180, 90,
             guiTop + 45, guiTop + 130,
             18, leftCol, guiTop + 45
         );
         addSelectableChild(songList);
 
-        // Play/Pause
         addDrawableChild(ButtonWidget.builder(
             Text.literal("▶ Play"),
             btn -> {
@@ -118,7 +110,6 @@ public class MusicControllerScreen extends Screen {
         addDrawableChild(ButtonWidget.builder(Text.literal("⏹"), btn -> player.stop())
             .dimensions(leftCol + 117, guiTop + 135, 24, 18).build());
 
-        // Volume slider
         addDrawableChild(new SliderWidget(
             leftCol, guiTop + 158, 140, 18,
             Text.literal("Vol: " + (int)(config.volume * 100) + "%"),
@@ -136,7 +127,6 @@ public class MusicControllerScreen extends Screen {
             }
         });
 
-        // Shuffle / Loop
         addDrawableChild(ButtonWidget.builder(
             Text.literal(config.shuffle ? "🔀 ON" : "🔀 OFF"),
             btn -> { config.shuffle = !config.shuffle; config.save(); init(); }
@@ -147,7 +137,6 @@ public class MusicControllerScreen extends Screen {
             btn -> { config.loop = !config.loop; config.save(); init(); }
         ).dimensions(leftCol + 48, guiTop + 180, 45, 18).build());
 
-        // Twitch section
         TextWidget twitchLabel = new TextWidget(rightCol, guiTop + 45, 80, 10,
             Text.literal("§7Twitch:"), textRenderer);
         addDrawableChild(twitchLabel);
@@ -169,7 +158,6 @@ public class MusicControllerScreen extends Screen {
             }
         ).dimensions(rightCol + 88, guiTop + 56, 80, 17).build());
 
-        // Vote
         TextWidget voteLabel = new TextWidget(rightCol, guiTop + 78, 80, 10,
             Text.literal("§7Votación:"), textRenderer);
         addDrawableChild(voteLabel);
@@ -190,20 +178,15 @@ public class MusicControllerScreen extends Screen {
         ).dimensions(rightCol + 44, guiTop + 89, 55, 17).build());
     }
 
-    // ============== SPOTIFY TAB ==============
     private void drawSpotifyTab() {
-        int cx = guiLeft + GUI_WIDTH / 2;
         var auth = MusicMod.getInstance().getSpotifyAuthManager();
         var sp = MusicMod.getInstance().getSpotifyPlayer();
 
-        // Login button
         spotifyLoginButton = addDrawableChild(ButtonWidget.builder(
             Text.literal(auth.isAuthenticated() ? "✓ Spotify Conectado" : "🔗 Login Spotify"),
             btn -> {
                 if (!auth.isAuthenticated()) {
-                    auth.login().thenAccept(success -> {
-                        if (success) init();
-                    });
+                    auth.login();
                 } else {
                     auth.logout();
                     init();
@@ -211,7 +194,6 @@ public class MusicControllerScreen extends Screen {
             }
         ).dimensions(guiLeft + 10, guiTop + 45, 140, 20).build());
 
-        // Spotify integration toggle
         SpotifyConfig sc = config.spotify;
         addDrawableChild(ButtonWidget.builder(
             Text.literal(sc.enabled ? "Integración: ON" : "Integración: OFF"),
@@ -220,20 +202,17 @@ public class MusicControllerScreen extends Screen {
 
         if (!auth.isAuthenticated()) return;
 
-        // Now playing info
         SpotifyTrackInfo track = sp.getCurrentTrack();
         if (track != null) {
-            Text trackText = Text.literal("§lNow:§r " + track.name + " §7- " + track.artists);
             TextWidget trackWidget = new TextWidget(guiLeft + 10, guiTop + 72, GUI_WIDTH - 20, 12,
-                trackText, textRenderer);
+                Text.literal("§lNow:§r " + track.name + " §7- " + track.artists), textRenderer);
             addDrawableChild(trackWidget);
         } else {
             addDrawableChild(new TextWidget(guiLeft + 10, guiTop + 72, GUI_WIDTH - 20, 12,
                 Text.literal("§7Sin reproducción activa"), textRenderer));
         }
 
-        // Playback controls
-        spotifyPlayPauseButton = addDrawableChild(ButtonWidget.builder(
+        addDrawableChild(ButtonWidget.builder(
             Text.literal(sp.isPlaying() ? "⏸ Pausar" : "▶ Reproducir"),
             btn -> {
                 if (player.getSource().equals("spotify") && player.isPlaying()) {
@@ -245,17 +224,16 @@ public class MusicControllerScreen extends Screen {
             }
         ).dimensions(guiLeft + 10, guiTop + 90, 70, 20).build());
 
-        spotifyNextButton = addDrawableChild(ButtonWidget.builder(
+        addDrawableChild(ButtonWidget.builder(
             Text.literal("⏭ Siguiente"),
             btn -> { sp.nextTrack(); init(); }
         ).dimensions(guiLeft + 85, guiTop + 90, 65, 20).build());
 
-        spotifyPrevButton = addDrawableChild(ButtonWidget.builder(
+        addDrawableChild(ButtonWidget.builder(
             Text.literal("⏮ Anterior"),
             btn -> { sp.previousTrack(); init(); }
         ).dimensions(guiLeft + 155, guiTop + 90, 65, 20).build());
 
-        // Volume
         addDrawableChild(new SliderWidget(
             guiLeft + 10, guiTop + 115, 140, 18,
             Text.literal("Vol: " + sp.getVolumePercent() + "%"),
@@ -271,7 +249,6 @@ public class MusicControllerScreen extends Screen {
             }
         });
 
-        // Search
         TextWidget searchLabel = new TextWidget(guiLeft + 10, guiTop + 140, 80, 10,
             Text.literal("§7Buscar canción:"), textRenderer);
         addDrawableChild(searchLabel);
@@ -290,7 +267,6 @@ public class MusicControllerScreen extends Screen {
             }
         ).dimensions(guiLeft + 155, guiTop + 152, 60, 18).build());
 
-        // Playlist search
         addDrawableChild(ButtonWidget.builder(
             Text.literal("▶ Playlist..."),
             btn -> {
@@ -301,14 +277,12 @@ public class MusicControllerScreen extends Screen {
             }
         ).dimensions(guiLeft + 10, guiTop + 175, 100, 18).build());
 
-        // List devices
         addDrawableChild(ButtonWidget.builder(
             Text.literal("📱 Dispositivos"),
             btn -> sp.listDevices()
         ).dimensions(guiLeft + 115, guiTop + 175, 100, 18).build());
     }
 
-    // ============== VOICE TAB ==============
     private void drawVoiceTab() {
         var voice = MusicMod.getInstance().getVoiceManager();
         VoiceConfig vc = config.voice;
@@ -325,7 +299,6 @@ public class MusicControllerScreen extends Screen {
             }
         ).dimensions(guiLeft + 10, guiTop + 45, 130, 20).build());
 
-        // Status indicator
         String status;
         if (!voice.isModelLoaded()) {
             status = "§cModelo no cargado";
@@ -337,27 +310,22 @@ public class MusicControllerScreen extends Screen {
         addDrawableChild(new TextWidget(guiLeft + 145, guiTop + 47, 100, 10,
             Text.literal(status), textRenderer));
 
-        // Voice toggle keybind hint
         addDrawableChild(new TextWidget(guiLeft + 10, guiTop + 68, GUI_WIDTH - 20, 10,
             Text.literal("§7Tecla rápida: V"), textRenderer));
 
-        // Model info
         addDrawableChild(new TextWidget(guiLeft + 10, guiTop + 85, GUI_WIDTH - 20, 10,
             Text.literal("§7Modelo: vosk-model-small-es-0.42"), textRenderer));
 
-        // Continuous listening toggle
         addDrawableChild(ButtonWidget.builder(
             Text.literal(vc.continuousListening ? "Escucha contínua: ON" : "Escucha contínua: OFF"),
             btn -> { vc.continuousListening = !vc.continuousListening; config.save(); init(); }
         ).dimensions(guiLeft + 10, guiTop + 100, 140, 18).build());
 
-        // Show recognized text
         addDrawableChild(ButtonWidget.builder(
             Text.literal(vc.showRecognizedText ? "Mostrar texto: ON" : "Mostrar texto: OFF"),
             btn -> { vc.showRecognizedText = !vc.showRecognizedText; config.save(); init(); }
         ).dimensions(guiLeft + 155, guiTop + 100, 140, 18).build());
 
-        // Comandos disponibles
         TextWidget cmdLabel = new TextWidget(guiLeft + 10, guiTop + 125, 100, 10,
             Text.literal("§lComandos disponibles:"), textRenderer);
         addDrawableChild(cmdLabel);
@@ -379,7 +347,6 @@ public class MusicControllerScreen extends Screen {
             y += 10;
         }
 
-        // Download model link
         addDrawableChild(ButtonWidget.builder(
             Text.literal("📥 Descargar modelo Vosk"),
             btn -> MinecraftClient.getInstance().player.sendMessage(
@@ -393,10 +360,8 @@ public class MusicControllerScreen extends Screen {
         context.fill(guiLeft, guiTop, guiLeft + GUI_WIDTH, guiTop + GUI_HEIGHT, 0xC0101010);
         context.drawBorder(guiLeft, guiTop, GUI_WIDTH, GUI_HEIGHT, 0xFF444444);
 
-        // Title
         context.drawText(textRenderer, Text.literal("§lMusic Controller"), guiLeft + 8, guiTop + 6, 0xFFFFFF, true);
 
-        // Now playing (local)
         if (currentTab == Tab.LOCAL) {
             SongEntry current = player.getCurrentSong();
             String now = player.getSource().equals("spotify")
@@ -421,13 +386,12 @@ public class MusicControllerScreen extends Screen {
     @Override
     public boolean shouldPause() { return false; }
 
-    // ============== SONG LIST WIDGETS ==============
-    private static class SongListWidget extends ElementListWidget<SongEntryWidget> {
+    private static class SongListWidget extends WidgetListWidget<SongEntryWidget> {
         private final List<SongEntry> entries;
 
-        public SongListWidget(MinecraftClient client, int width, int height, int top, int bottom, int itemHeight,
+        public SongListWidget(Screen screen, int width, int height, int top, int bottom, int itemHeight,
                               int x, int y) {
-            super(client, width, height, y, itemHeight);
+            super(screen, width, height, y, itemHeight);
             this.entries = MusicMod.getInstance().getConfig().playlist;
             setX(x);
             for (int i = 0; i < entries.size(); i++) {
@@ -446,7 +410,7 @@ public class MusicControllerScreen extends Screen {
         protected int getScrollbarPositionX() { return getX() + width - 6; }
     }
 
-    private static class SongEntryWidget extends ElementListWidget.Entry<SongEntryWidget> {
+    private static class SongEntryWidget extends WidgetListWidget.Entry<SongEntryWidget> {
         private final SongEntry song;
         private final int index;
 

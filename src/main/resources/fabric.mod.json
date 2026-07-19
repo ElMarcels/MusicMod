@@ -12,9 +12,6 @@
   "entrypoints": {
     "client": [
       "com.musicmod.MusicMod"
-    ],
-    "modmenu": [
-      "com.musicmod.config.ModMenuIntegration"
     ]
   },
   "mixins": [

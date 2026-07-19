@@ -6,7 +6,9 @@ import com.musicmod.config.ModConfig.SongEntry;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.sound.PositionedSoundInstance;
 import net.minecraft.client.sound.SoundInstance;
+import net.minecraft.client.sound.SoundManager;
 import net.minecraft.sound.SoundCategory;
+import net.minecraft.sound.SoundEvent;
 import net.minecraft.util.Identifier;
 import java.util.*;
 
@@ -19,10 +21,8 @@ public class MusicPlayer {
     private final Random random = new Random();
     private List<SongEntry> shuffledPlaylist = new ArrayList<>();
 
-    // Source: "local" or "spotify"
     private String source = "local";
 
-    // Vote system
     private final List<VoteEntry> votes = new ArrayList<>();
     private long voteEndTime = 0;
     private boolean voteActive = false;
@@ -34,8 +34,12 @@ public class MusicPlayer {
 
         currentSong = song;
         Identifier soundId = Identifier.of(song.soundId);
-        currentSound = PositionedSoundInstance.music(soundId);
-        client.getSoundManager().play(currentSound);
+        SoundEvent soundEvent = SoundEvent.of(soundId);
+        currentSound = PositionedSoundInstance.music(soundEvent);
+        SoundManager soundManager = client.getSoundManager();
+        if (soundManager != null) {
+            soundManager.play(currentSound);
+        }
         playing = true;
         MusicMod.LOGGER.info("Now playing: {}", song.name);
     }
@@ -51,8 +55,9 @@ public class MusicPlayer {
         if (source.equals("spotify")) {
             MusicMod.getInstance().getSpotifyPlayer().pause();
         }
-        if (currentSound != null && client.getSoundManager() != null) {
-            client.getSoundManager().stop(currentSound);
+        SoundManager soundManager = client.getSoundManager();
+        if (currentSound != null && soundManager != null) {
+            soundManager.stop(currentSound);
         }
         playing = false;
         currentSound = null;
@@ -64,8 +69,9 @@ public class MusicPlayer {
             playing = false;
             return;
         }
-        if (playing && currentSound != null) {
-            client.getSoundManager().stop(currentSound);
+        SoundManager soundManager = client.getSoundManager();
+        if (playing && currentSound != null && soundManager != null) {
+            soundManager.stop(currentSound);
             playing = false;
         }
     }
@@ -121,15 +127,15 @@ public class MusicPlayer {
         if (source.equals("spotify")) {
             MusicMod.getInstance().getSpotifyPlayer().setVolume((int)(volume * 100));
         }
-        if (currentSound != null) {
-            client.getSoundManager().updateSoundVolume(SoundCategory.MUSIC, volume);
+        SoundManager soundManager = client.getSoundManager();
+        if (currentSound != null && soundManager != null) {
+            soundManager.updateSoundVolume(SoundCategory.MUSIC, volume);
         }
     }
 
     public String getSource() { return source; }
     public void setSource(String source) { this.source = source; }
 
-    // Vote system
     public void startVote(int durationSeconds) {
         votes.clear();
         voteActive = true;

@@ -1,5 +1,5 @@
 plugins {
-    id 'fabric-loom' version '1.7-SNAPSHOT'
+    id 'fabric-loom' version '1.10-SNAPSHOT'
     id 'maven-publish'
 }
 
@@ -31,21 +31,14 @@ dependencies {
     implementation 'com.squareup.okhttp3:okhttp:4.12.0'
     implementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
 
-    // Embedded HTTP server for OAuth callback
-    implementation 'com.sun.net.httpserver:http:20070405'
-
     // Vosk offline speech recognition
     implementation 'com.alphacephei:vosk:0.3.45'
-
-    // JSON parsing
-    implementation 'com.google.code.gson:gson:2.11.0'
 
     // Include all runtime deps in the jar
     include 'se.michaelthelin.spotify:spotify-web-api-java:8.4.1'
     include 'com.squareup.okhttp3:okhttp:4.12.0'
     include 'com.squareup.okhttp3:logging-interceptor:4.12.0'
     include 'com.alphacephei:vosk:0.3.45'
-    include 'com.google.code.gson:gson:2.11.0'
 }
 
 processResources {
@@ -55,14 +48,15 @@ processResources {
     }
 }
 
-tasks.withType(JavaCompile).configureEach {
-    it.options.release = 21
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+    withSourcesJar()
 }
 
-java {
-    withSourcesJar()
-    sourceCompatibility = JavaVersion.VERSION_21
-    targetCompatibility = JavaVersion.VERSION_21
+tasks.withType(JavaCompile).configureEach {
+    it.options.release = 21
 }
 
 jar {

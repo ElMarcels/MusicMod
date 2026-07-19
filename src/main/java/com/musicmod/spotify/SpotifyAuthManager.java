@@ -7,6 +7,7 @@ import com.sun.net.httpserver.HttpExchange;
 import net.minecraft.client.MinecraftClient;
 import net.minecraft.text.ClickEvent;
 import net.minecraft.text.HoverEvent;
+import net.minecraft.text.Style;
 import net.minecraft.text.Text;
 import org.apache.hc.core5.net.URIBuilder;
 import se.michaelthelin.spotify.SpotifyApi;
@@ -64,13 +65,8 @@ public class SpotifyAuthManager {
         MusicMod.getInstance().getConfig().save();
     }
 
-    public CompletableFuture<Boolean> login() {
-        CompletableFuture<Boolean> future = new CompletableFuture<>();
-
-        if (authenticated) {
-            future.complete(true);
-            return future;
-        }
+    public void login() {
+        if (authenticated) return;
 
         try {
             server = HttpServer.create(new InetSocketAddress(LOCAL_PORT), 0);
@@ -96,14 +92,13 @@ public class SpotifyAuthManager {
                     }
 
                     exchangeClose();
-                    completeAuth(code, future);
+                    completeAuth(code);
                 } else {
                     response = "<html><body><h1>Error de autenticación</h1></body></html>";
                     exchange.sendResponseHeaders(400, response.getBytes(StandardCharsets.UTF_8).length);
                     try (OutputStream os = exchange.getResponseBody()) {
                         os.write(response.getBytes(StandardCharsets.UTF_8));
                     }
-                    future.complete(false);
                 }
             });
             server.setExecutor(null);
@@ -119,10 +114,11 @@ public class SpotifyAuthManager {
             if (client.player != null) {
                 Text msg = Text.literal("§a[Música] Abriendo Spotify en el navegador... ");
                 Text link = Text.literal("§9§n[Haz clic aquí si no se abre]")
-                    .styled(style -> style
+                    .setStyle(Style.EMPTY
                         .withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, uri.toString()))
                         .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, Text.literal("Abrir URL manualmente"))));
-                client.player.sendMessage(msg.append(link));
+                client.player.sendMessage(msg);
+                client.player.sendMessage(link);
             }
 
             if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
@@ -132,13 +128,10 @@ public class SpotifyAuthManager {
             MusicMod.LOGGER.info("Spotify auth URL: {}", uri);
         } catch (Exception e) {
             MusicMod.LOGGER.error("Failed to start Spotify auth", e);
-            future.complete(false);
         }
-
-        return future;
     }
 
-    private void completeAuth(String code, CompletableFuture<Boolean> future) {
+    private void completeAuth(String code) {
         try {
             var request = buildApi().authorizationCode(code).build();
             var credentials = request.execute();
@@ -150,10 +143,8 @@ public class SpotifyAuthManager {
                 MinecraftClient.getInstance().player.sendMessage(
                     Text.literal("§a[Música] Spotify conectado exitosamente!"), false);
             }
-            future.complete(true);
         } catch (Exception e) {
             MusicMod.LOGGER.error("Spotify auth exchange failed", e);
-            future.complete(false);
         }
     }
 

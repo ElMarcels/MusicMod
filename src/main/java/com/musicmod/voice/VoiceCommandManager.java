@@ -11,6 +11,7 @@ import java.io.*;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class VoiceCommandManager {
@@ -23,16 +24,18 @@ public class VoiceCommandManager {
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final AtomicBoolean listening = new AtomicBoolean(false);
     private boolean modelLoaded = false;
-    private final Set<VoiceCommand> commands = new LinkedHashSet<>();
-    private final List<VoiceListener> listeners = new ArrayList<>();
+    private final List<VoiceCommand> commands = new ArrayList<>();
 
     public VoiceCommandManager() {
         registerDefaultCommands();
     }
 
     private void registerDefaultCommands() {
-        // Español
-        commands.add(new VoiceCommand("reproducir|poner|play", cmd -> triggerSpotifySearch(cmd)));
+        commands.add(new VoiceCommand("reproducir (.*)|poner (.*)|play (.*)", cmd -> {
+            String text = cmd.getFullText();
+            String query = text.replaceAll("^(reproducir|poner|play)\\s+", "").trim();
+            if (!query.isEmpty()) triggerSpotifySearch(query);
+        }));
         commands.add(new VoiceCommand("pausa|parar|stop", cmd -> {
             MusicMod.getInstance().getMusicPlayer().pause();
             sendFeedback("§e[Música] Pausado");
@@ -45,14 +48,14 @@ public class VoiceCommandManager {
             MusicMod.getInstance().getMusicPlayer().previous();
             sendFeedback("§e[Música] Canción anterior");
         }));
-        commands.add(new VoiceCommand("sube volumen|volumen arriba|volumen más", cmd -> {
+        commands.add(new VoiceCommand("sube volumen|volumen arriba|más volumen", cmd -> {
             ModConfig config = MusicMod.getInstance().getConfig();
             config.volume = Math.min(1.0f, config.volume + 0.1f);
             MusicMod.getInstance().getMusicPlayer().setVolume(config.volume);
             config.save();
             sendFeedback("§a[Música] Volumen: " + (int)(config.volume * 100) + "%");
         }));
-        commands.add(new VoiceCommand("baja volumen|volumen abajo|volumen menos", cmd -> {
+        commands.add(new VoiceCommand("baja volumen|volumen abajo|menos volumen", cmd -> {
             ModConfig config = MusicMod.getInstance().getConfig();
             config.volume = Math.max(0.0f, config.volume - 0.1f);
             MusicMod.getInstance().getMusicPlayer().setVolume(config.volume);
@@ -73,10 +76,8 @@ public class VoiceCommandManager {
             MinecraftClient.getInstance().setScreen(
                 new com.musicmod.gui.MusicControllerScreen());
         }));
-
-        // Spotify commands
         commands.add(new VoiceCommand("spotify login|conectar spotify", cmd -> {
-            var auth = com.musicmod.MusicMod.getInstance().getSpotifyAuthManager();
+            var auth = MusicMod.getInstance().getSpotifyAuthManager();
             if (!auth.isAuthenticated()) {
                 auth.login();
             } else {
@@ -84,22 +85,13 @@ public class VoiceCommandManager {
             }
         }));
         commands.add(new VoiceCommand("spotify play|spotify reproduce", cmd -> {
-            var sp = com.musicmod.MusicMod.getInstance().getSpotifyPlayer();
-            sp.play();
+            MusicMod.getInstance().getSpotifyPlayer().play();
         }));
         commands.add(new VoiceCommand("spotify pausa|spotify stop", cmd -> {
-            var sp = com.musicmod.MusicMod.getInstance().getSpotifyPlayer();
-            sp.pause();
+            MusicMod.getInstance().getSpotifyPlayer().pause();
         }));
         commands.add(new VoiceCommand("spotify siguiente|spotify next", cmd -> {
-            var sp = com.musicmod.MusicMod.getInstance().getSpotifyPlayer();
-            sp.nextTrack();
-        }));
-        commands.add(new VoiceCommand("busca (.*)", cmd -> {
-            if (cmd.matcher.matches()) {
-                String query = cmd.matcher.group(1);
-                triggerSpotifySearch(query);
-            }
+            MusicMod.getInstance().getSpotifyPlayer().nextTrack();
         }));
     }
 
@@ -189,14 +181,13 @@ public class VoiceCommandManager {
             for (VoiceCommand cmd : commands) {
                 if (cmd.matches(text)) {
                     cmd.execute(text);
-                    if (MusicMod.getInstance().getConfig().showHud) {
+                    if (MusicMod.getInstance().getConfig().voice.showRecognizedText) {
                         sendFeedback("§7[Voz] §f\"" + text + "\"");
                     }
                     return;
                 }
             }
 
-            // If no command matched, try Spotify search
             if (MusicMod.getInstance().getConfig().spotify.enabled &&
                 MusicMod.getInstance().getSpotifyAuthManager().isAuthenticated()) {
                 if (text.length() > 3) {
@@ -224,19 +215,11 @@ public class VoiceCommandManager {
     public boolean isListening() { return listening.get(); }
     public boolean isModelLoaded() { return modelLoaded; }
 
-    public void addListener(VoiceListener listener) {
-        listeners.add(listener);
-    }
-
-    public interface VoiceListener {
-        void onCommand(String command, String rawText);
-    }
-
     public static class VoiceCommand {
         private final Pattern pattern;
         private final String rawPattern;
         private final CommandAction action;
-        public Matcher matcher;
+        private String fullText;
 
         public VoiceCommand(String regex, CommandAction action) {
             this.rawPattern = regex;
@@ -245,14 +228,15 @@ public class VoiceCommandManager {
         }
 
         public boolean matches(String text) {
-            matcher = pattern.matcher(text);
-            return matcher.find();
+            return pattern.matcher(text).find();
         }
 
         public void execute(String text) {
+            this.fullText = text;
             action.execute(this);
         }
 
+        public String getFullText() { return fullText; }
         public String getRawPattern() { return rawPattern; }
     }
 
